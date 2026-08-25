@@ -4,7 +4,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from semverconv import SemVer, parse_semver, format_semver, semver_to_pep440
+from semverconv import (
+    SemVer,
+    parse_semver,
+    format_semver,
+    semver_to_pep440,
+    pep440_to_semver,
+)
 
 
 class ParseSemverTests(unittest.TestCase):
@@ -58,6 +64,52 @@ class SemverToPep440Tests(unittest.TestCase):
     def test_unsupported_prerelease_label_raises(self):
         with self.assertRaises(ValueError):
             semver_to_pep440("1.2.3-nightly.1")
+
+
+class Pep440ToSemverTests(unittest.TestCase):
+    def test_plain_release(self):
+        self.assertEqual(pep440_to_semver("1.2.3"), "1.2.3")
+
+    def test_pads_missing_release_parts(self):
+        self.assertEqual(pep440_to_semver("1.2"), "1.2.0")
+        self.assertEqual(pep440_to_semver("1"), "1.0.0")
+
+    def test_alpha_prerelease(self):
+        self.assertEqual(pep440_to_semver("1.2.3a1"), "1.2.3-alpha.1")
+
+    def test_prerelease_without_number(self):
+        self.assertEqual(pep440_to_semver("1.2.3b"), "1.2.3-beta.0")
+
+    def test_rc_prerelease(self):
+        self.assertEqual(pep440_to_semver("1.2.3rc2"), "1.2.3-rc.2")
+
+    def test_c_label_maps_to_rc(self):
+        self.assertEqual(pep440_to_semver("1.2.3c1"), "1.2.3-rc.1")
+
+    def test_local_version_becomes_build_metadata(self):
+        self.assertEqual(
+            pep440_to_semver("1.2.3+build.5114f85"), "1.2.3+build.5114f85"
+        )
+
+    def test_round_trip_through_semver_to_pep440(self):
+        for text in ("1.2.3", "1.2.3-alpha.1", "1.2.3-rc.2", "1.2.3+build.5"):
+            self.assertEqual(pep440_to_semver(semver_to_pep440(text)), text)
+
+    def test_rejects_garbage(self):
+        with self.assertRaises(ValueError):
+            pep440_to_semver("not-a-version")
+
+    def test_rejects_post_release(self):
+        with self.assertRaises(ValueError):
+            pep440_to_semver("1.2.3.post1")
+
+    def test_rejects_dev_release(self):
+        with self.assertRaises(ValueError):
+            pep440_to_semver("1.2.3.dev1")
+
+    def test_rejects_epoch(self):
+        with self.assertRaises(ValueError):
+            pep440_to_semver("1!1.2.3")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ tools will accept when it cuts a wheel. SemVer and PEP 440 look similar but
 aren't compatible: `1.2.3-alpha.1` is valid SemVer and invalid PEP 440;
 `pip` and `setuptools` want `1.2.3a1` instead.
 
-`semverconv` converts SemVer 2.0.0 strings into PEP 440 strings.
+`semverconv` converts SemVer 2.0.0 strings into PEP 440 strings, and back.
 
 ## Usage
 
@@ -18,6 +18,18 @@ semver_to_pep440("1.2.3")                    # "1.2.3"
 semver_to_pep440("1.2.3-alpha.1")             # "1.2.3a1"
 semver_to_pep440("1.2.3-rc.2")                # "1.2.3rc2"
 semver_to_pep440("1.2.3+build.5114f85")       # "1.2.3+build.5114f85"
+```
+
+`pep440_to_semver` goes the other way, for the subset of PEP 440 that
+`semver_to_pep440` can produce:
+
+```python
+from semverconv import pep440_to_semver
+
+pep440_to_semver("1.2.3")                     # "1.2.3"
+pep440_to_semver("1.2.3a1")                   # "1.2.3-alpha.1"
+pep440_to_semver("1.2.3rc2")                  # "1.2.3-rc.2"
+pep440_to_semver("1.2.3+build.5114f85")       # "1.2.3+build.5114f85"
 ```
 
 Parsing and formatting are also exposed on their own, for when you just need
@@ -47,7 +59,10 @@ a `setup.py`, a release script, a CI step.
 - Only the first two prerelease identifiers are used (`alpha.1.2` becomes
   `a1`, dropping the trailing `.2`). PEP 440 prereleases don't support a
   chain of identifiers the way SemVer does.
-- There's no `pep440_to_semver` yet — conversion is one-way for now.
+- `pep440_to_semver` only understands a bare release segment plus an
+  optional `a`/`b`/`rc` prerelease and local version. PEP 440 epochs,
+  `.postN`, and `.devN` releases raise `ValueError` — there's no SemVer
+  equivalent for them wired up yet.
 
 ## Running the tests
 

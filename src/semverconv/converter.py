@@ -1,4 +1,4 @@
-"""Convert Semantic Versioning 2.0.0 strings to PEP 440 version strings.
+"""Convert between Semantic Versioning 2.0.0 and PEP 440 version strings.
 
 Every function here is pure: same input always gives the same output, and
 nothing is read from or written to the outside world. That makes the whole
@@ -34,6 +34,30 @@ _PRERELEASE_LABELS = {
     "rc": "rc",
     "pre": "rc",
 }
+
+# Mirrors _PRERELEASE_LABELS in the other direction. PEP 440 accepts a few
+# spellings ("c", "pre", "preview") that SemVer has no equivalent for, so
+# they all collapse onto the closest SemVer label.
+_PEP440_PRERELEASE_LABELS = {
+    "a": "alpha",
+    "alpha": "alpha",
+    "b": "beta",
+    "beta": "beta",
+    "rc": "rc",
+    "c": "rc",
+    "pre": "rc",
+    "preview": "rc",
+}
+
+# Subset of the PEP 440 grammar this module can round-trip back to SemVer:
+# a bare release segment of one to three numbers, an optional prerelease,
+# and an optional local version. No epoch, post-release, or dev-release
+# support yet (see pep440_to_semver's docstring).
+_PEP440_RE = re.compile(
+    r"^(?P<release>\d+(?:\.\d+){0,2})"
+    r"(?:(?P<pre_label>a|b|c|rc|alpha|beta|pre|preview)(?P<pre_number>\d*))?"
+    r"(?:\+(?P<local>[a-zA-Z0-9]+(?:\.[a-zA-Z0-9]+)*))?$"
+)
 
 
 @dataclass(frozen=True)
@@ -108,3 +132,36 @@ def _prerelease_to_pep440(prerelease: str) -> str:
 def _sanitize_local(build: str) -> str:
     sanitized = _LOCAL_SEGMENT_RE.sub(".", build)
     return sanitized.strip(".")
+
+
+def pep440_to_semver(version: str) -> str:
+    """Convert a PEP 440 version string back to a SemVer 2.0.0 string.
+
+    Handles the subset of PEP 440 that semver_to_pep440 can produce: a
+    release segment of up to three numbers (missing trailing numbers are
+    treated as 0, matching PEP 440's own rule), an optional a/b/rc
+    prerelease, and an optional local version (carried straight over as
+    SemVer build metadata, since PEP 440's local version alphabet is
+    already valid there). Epochs, post-releases, and dev-releases have no
+    SemVer equivalent yet and raise ValueError.
+    """
+    match = _PEP440_RE.match(version.strip())
+    if match is None:
+        raise ValueError(
+            f"not a PEP 440 version this module can convert to SemVer: {version!r}"
+        )
+
+    release = [int(part) for part in match.group("release").split(".")]
+    release += [0] * (3 - len(release))
+    major, minor, patch = release
+
+    prerelease = None
+    pre_label = match.group("pre_label")
+    if pre_label is not None:
+        semver_label = _PEP440_PRERELEASE_LABELS[pre_label.lower()]
+        number = int(match.group("pre_number") or "0")
+        prerelease = f"{semver_label}.{number}"
+
+    build = match.group("local")
+
+    return format_semver(SemVer(major, minor, patch, prerelease, build))
