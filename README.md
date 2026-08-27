@@ -20,6 +20,16 @@ semver_to_pep440("1.2.3-rc.2")                # "1.2.3rc2"
 semver_to_pep440("1.2.3+build.5114f85")       # "1.2.3+build.5114f85"
 ```
 
+SemVer has no native idea of a post- or dev-release, so `semver_to_pep440`
+uses a convention for them: a prerelease whose first identifier is `dev` or
+`post` becomes a PEP 440 dev- or post-release segment instead of a lettered
+prerelease.
+
+```python
+semver_to_pep440("1.2.3-dev.1")               # "1.2.3.dev1"
+semver_to_pep440("1.2.3-post.2")              # "1.2.3.post2"
+```
+
 `pep440_to_semver` goes the other way, for the subset of PEP 440 that
 `semver_to_pep440` can produce:
 
@@ -30,6 +40,8 @@ pep440_to_semver("1.2.3")                     # "1.2.3"
 pep440_to_semver("1.2.3a1")                   # "1.2.3-alpha.1"
 pep440_to_semver("1.2.3rc2")                  # "1.2.3-rc.2"
 pep440_to_semver("1.2.3+build.5114f85")       # "1.2.3+build.5114f85"
+pep440_to_semver("1.2.3.dev1")                # "1.2.3-dev.1"
+pep440_to_semver("1.2.3.post2")               # "1.2.3-post.2"
 ```
 
 Parsing and formatting are also exposed on their own, for when you just need
@@ -59,10 +71,12 @@ a `setup.py`, a release script, a CI step.
 - Only the first two prerelease identifiers are used (`alpha.1.2` becomes
   `a1`, dropping the trailing `.2`). PEP 440 prereleases don't support a
   chain of identifiers the way SemVer does.
-- `pep440_to_semver` only understands a bare release segment plus an
-  optional `a`/`b`/`rc` prerelease and local version. PEP 440 epochs,
-  `.postN`, and `.devN` releases raise `ValueError` — there's no SemVer
-  equivalent for them wired up yet.
+- `pep440_to_semver` only understands a bare release segment plus at most
+  one of an `a`/`b`/`rc` prerelease, a `.postN`, or a `.devN` release, plus
+  a local version. PEP 440 epochs, and versions that combine a prerelease
+  with a post- or dev-release (e.g. `1.2.3a1.dev1`), raise `ValueError` —
+  SemVer only has one prerelease chain, so there's no way to represent both
+  at once.
 
 ## Running the tests
 

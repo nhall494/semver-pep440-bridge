@@ -50,12 +50,16 @@ _PEP440_PRERELEASE_LABELS = {
 }
 
 # Subset of the PEP 440 grammar this module can round-trip back to SemVer:
-# a bare release segment of one to three numbers, an optional prerelease,
-# and an optional local version. No epoch, post-release, or dev-release
-# support yet (see pep440_to_semver's docstring).
+# a bare release segment of one to three numbers, then at most one of a
+# prerelease, a post-release, or a dev-release (this module's SemVer model
+# can't express two of those at once, since SemVer only has room for a
+# single prerelease chain), and an optional local version. Epochs, and
+# combinations of pre/post/dev, have no SemVer equivalent and are rejected.
 _PEP440_RE = re.compile(
     r"^(?P<release>\d+(?:\.\d+){0,2})"
-    r"(?:(?P<pre_label>a|b|c|rc|alpha|beta|pre|preview)(?P<pre_number>\d*))?"
+    r"(?:(?P<pre_label>a|b|c|rc|alpha|beta|pre|preview)(?P<pre_number>\d*)"
+    r"|\.post(?P<post_number>\d+)"
+    r"|\.dev(?P<dev_number>\d+))?"
     r"(?:\+(?P<local>[a-zA-Z0-9]+(?:\.[a-zA-Z0-9]+)*))?$"
 )
 
@@ -104,6 +108,13 @@ def semver_to_pep440(version: str) -> str:
     (e.g. "alpha.1" or "rc.2"); anything past that is dropped, since PEP 440
     has no room for an arbitrary-length prerelease chain. Build metadata is
     carried over as a PEP 440 local version segment.
+
+    SemVer has no native concept of post- or dev-releases, so this module
+    uses a convention: a prerelease whose first identifier is "dev" or
+    "post" (e.g. "1.2.3-dev.1" or "1.2.3-post.2") becomes a PEP 440 dev- or
+    post-release segment instead of a lettered prerelease. Since SemVer only
+    has one prerelease chain, a version can't carry both a prerelease and a
+    post/dev segment at once.
     """
     parsed = parse_semver(version)
 
@@ -117,6 +128,12 @@ def semver_to_pep440(version: str) -> str:
 def _prerelease_to_pep440(prerelease: str) -> str:
     parts = prerelease.split(".")
     label = parts[0].lower()
+    number = parts[1] if len(parts) > 1 and parts[1].isdigit() else "0"
+
+    if label == "dev":
+        return f".dev{number}"
+    if label == "post":
+        return f".post{number}"
 
     try:
         pep440_letter = _PRERELEASE_LABELS[label]
@@ -125,7 +142,6 @@ def _prerelease_to_pep440(prerelease: str) -> str:
             f"unsupported prerelease label for PEP 440 conversion: {parts[0]!r}"
         ) from None
 
-    number = parts[1] if len(parts) > 1 and parts[1].isdigit() else "0"
     return f"{pep440_letter}{number}"
 
 
@@ -139,11 +155,14 @@ def pep440_to_semver(version: str) -> str:
 
     Handles the subset of PEP 440 that semver_to_pep440 can produce: a
     release segment of up to three numbers (missing trailing numbers are
-    treated as 0, matching PEP 440's own rule), an optional a/b/rc
-    prerelease, and an optional local version (carried straight over as
-    SemVer build metadata, since PEP 440's local version alphabet is
-    already valid there). Epochs, post-releases, and dev-releases have no
-    SemVer equivalent yet and raise ValueError.
+    treated as 0, matching PEP 440's own rule), at most one of an a/b/rc
+    prerelease, a post-release, or a dev-release, and an optional local
+    version (carried straight over as SemVer build metadata, since PEP 440's
+    local version alphabet is already valid there). A post- or dev-release
+    becomes a SemVer prerelease whose first identifier is "post" or "dev"
+    (see semver_to_pep440's docstring for the convention this mirrors).
+    Epochs, and versions combining pre/post/dev, have no SemVer equivalent
+    and raise ValueError.
     """
     match = _PEP440_RE.match(version.strip())
     if match is None:
@@ -157,10 +176,16 @@ def pep440_to_semver(version: str) -> str:
 
     prerelease = None
     pre_label = match.group("pre_label")
+    post_number = match.group("post_number")
+    dev_number = match.group("dev_number")
     if pre_label is not None:
         semver_label = _PEP440_PRERELEASE_LABELS[pre_label.lower()]
         number = int(match.group("pre_number") or "0")
         prerelease = f"{semver_label}.{number}"
+    elif post_number is not None:
+        prerelease = f"post.{int(post_number)}"
+    elif dev_number is not None:
+        prerelease = f"dev.{int(dev_number)}"
 
     build = match.group("local")
 
