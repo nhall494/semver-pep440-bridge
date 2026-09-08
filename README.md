@@ -58,6 +58,19 @@ v.build                     # "exp.sha.5114f85"
 format_semver(v)             # "2.1.0-beta.3+exp.sha.5114f85"
 ```
 
+A SemVer prerelease chain longer than a label and a number has no PEP 440
+prerelease equivalent, so the full chain is carried in the local version
+instead:
+
+```python
+semver_to_pep440("1.2.3-alpha.1.2")           # "1.2.3a1+sv3.alpha.1.2"
+pep440_to_semver("1.2.3a1+sv3.alpha.1.2")     # "1.2.3-alpha.1.2"
+```
+
+The `svN.` prefix records how many identifiers to read back off the local
+version, so build metadata can still follow it in the same local version
+(`1.2.3-alpha.1.2+build.5` becomes `1.2.3a1+sv3.alpha.1.2.build.5`).
+
 Every function is pure: given the same string, it always returns the same
 result, and none of them touch the filesystem, environment, or network. That
 also means they compose cleanly with anything that needs a version string —
@@ -68,9 +81,14 @@ a `setup.py`, a release script, a CI step.
 - Only `alpha`, `beta`, and `rc` prerelease labels convert; anything else
   raises `ValueError`. There's no PEP 440 equivalent for an arbitrary label
   like `nightly`, so this needs a documented convention before it's handled.
-- Only the first two prerelease identifiers are used (`alpha.1.2` becomes
-  `a1`, dropping the trailing `.2`). PEP 440 prereleases don't support a
-  chain of identifiers the way SemVer does.
+- A prerelease identifier containing a hyphen (e.g. `alpha.some-id`) can't
+  be smuggled through a PEP 440 local version losslessly, since PEP 440's
+  local version alphabet has no hyphen. `semver_to_pep440` raises
+  `ValueError` rather than corrupt it.
+- Build metadata that happens to start with something matching the `svN.`
+  chain marker (e.g. `+sv2.foo.bar` as literal build metadata, not a
+  smuggled chain) will be misread by `pep440_to_semver` as a prerelease
+  chain. This is an inherent risk of using the local version as a carrier.
 - `pep440_to_semver` only understands a bare release segment plus at most
   one of an `a`/`b`/`rc` prerelease, a `.postN`, or a `.devN` release, plus
   a local version. PEP 440 epochs, and versions that combine a prerelease

@@ -74,6 +74,26 @@ class SemverToPep440Tests(unittest.TestCase):
     def test_post_prerelease_becomes_post_release(self):
         self.assertEqual(semver_to_pep440("1.2.3-post.1"), "1.2.3.post1")
 
+    def test_long_prerelease_chain_is_preserved_in_local_version(self):
+        self.assertEqual(
+            semver_to_pep440("1.2.3-alpha.1.2"), "1.2.3a1+sv3.alpha.1.2"
+        )
+
+    def test_non_numeric_second_identifier_is_preserved_in_local_version(self):
+        self.assertEqual(
+            semver_to_pep440("1.2.3-alpha.candidate"), "1.2.3a0+sv2.alpha.candidate"
+        )
+
+    def test_chain_and_build_metadata_both_land_in_local_version(self):
+        self.assertEqual(
+            semver_to_pep440("1.2.3-alpha.1.2+build.5"),
+            "1.2.3a1+sv3.alpha.1.2.build.5",
+        )
+
+    def test_hyphenated_identifier_in_chain_raises(self):
+        with self.assertRaises(ValueError):
+            semver_to_pep440("1.2.3-alpha.x-y.1")
+
 
 class Pep440ToSemverTests(unittest.TestCase):
     def test_plain_release(self):
@@ -106,6 +126,15 @@ class Pep440ToSemverTests(unittest.TestCase):
     def test_dev_release_becomes_dev_prerelease(self):
         self.assertEqual(pep440_to_semver("1.2.3.dev1"), "1.2.3-dev.1")
 
+    def test_recovers_long_prerelease_chain(self):
+        self.assertEqual(pep440_to_semver("1.2.3a1+sv3.alpha.1.2"), "1.2.3-alpha.1.2")
+
+    def test_recovers_prerelease_chain_alongside_build_metadata(self):
+        self.assertEqual(
+            pep440_to_semver("1.2.3a1+sv3.alpha.1.2.build.5"),
+            "1.2.3-alpha.1.2+build.5",
+        )
+
     def test_round_trip_through_semver_to_pep440(self):
         for text in (
             "1.2.3",
@@ -114,6 +143,9 @@ class Pep440ToSemverTests(unittest.TestCase):
             "1.2.3+build.5",
             "1.2.3-dev.1",
             "1.2.3-post.1",
+            "1.2.3-alpha.1.2",
+            "1.2.3-alpha.candidate",
+            "1.2.3-alpha.1.2+build.5",
         ):
             self.assertEqual(pep440_to_semver(semver_to_pep440(text)), text)
 
