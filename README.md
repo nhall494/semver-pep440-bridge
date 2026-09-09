@@ -96,6 +96,18 @@ a `setup.py`, a release script, a CI step.
   SemVer only has one prerelease chain, so there's no way to represent both
   at once.
 
+## Command line
+
+Installing the package also installs a `semverconv` command:
+
+```
+semverconv to-pep440 1.2.3-alpha.1     # 1.2.3a1
+semverconv to-semver 1.2.3a1           # 1.2.3-alpha.1
+```
+
+It exits with status 1 and prints an error to stderr if the version string
+doesn't parse.
+
 ## Running the tests
 
 ```

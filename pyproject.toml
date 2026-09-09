@@ -12,5 +12,8 @@ license = { text = "MIT" }
 authors = [{ name = "nhall494" }]
 dependencies = []
 
+[project.scripts]
+semverconv = "semverconv.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
