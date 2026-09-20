@@ -114,6 +114,10 @@ doesn't parse.
 python -m unittest discover tests
 ```
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT, see [LICENSE](LICENSE).
